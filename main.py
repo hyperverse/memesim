@@ -27,7 +27,11 @@ def main():
     logger.info(f"Pool Size: {config.POOL_SIZE}")
     logger.info(f"Internal Mutation Rate: {config.MU_BASE_INTERNAL}")
     logger.info(f"External Mutation Rate: {config.MU_BASE_EXTERNAL}")
-    logger.info(f"Entropy Scale Factor: {config.ENTROPY_SCALE_FACTOR}")
+    logger.info(f"Complexity Scale Factor: {config.COMPLEXITY_SCALE_FACTOR}")
+    if config.USE_UTILITY_SELECTION:
+        logger.info(f"Utility Selection: ENABLED (α={config.ALPHA}, β={config.BETA})")
+    else:
+        logger.info(f"Utility Selection: DISABLED (pure fidelity mode)")
     
     # Initialize random number generator with fixed seed for reproducibility
     # Remove seed parameter for random behavior each run
@@ -38,9 +42,9 @@ def main():
     grid = Grid(config.GRID_SIZE, rng)
     
     # Optional: Inject seed patterns
-    if config.USE_SEED_PATTERNS:
-        logger.info(f"Injecting {len(config.SEED_PATTERNS)} seed patterns...")
-        grid.inject_seed_patterns(config.SEED_PATTERNS)
+    if config.INJECT_UTILITY_PATTERNS:
+        logger.info(f"Injecting {len(config.UTILITY_PATTERNS)} utility patterns...")
+        grid.inject_patterns(config.UTILITY_PATTERNS)
     
     # Create simulation engine
     engine = SimulationEngine(grid, rng)

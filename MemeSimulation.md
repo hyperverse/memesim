@@ -219,3 +219,65 @@ This two-tiered structure allows to distinguish between two kinds of meme surviv
 The patterns that win globally will be those that have the **lowest possible Shannon Entropy** while still being distinct enough from a uniform pattern (e.g., `'00000000'`) to survive random internal mutations. 
 We expect to observe how low-entropy "replicator cores" emerge and colonize the grid.
 
+## Analysis: Entropy Plummets to Zero
+
+The convergence to the lowest possible entropy states (all $0$s or all $1$s) is the logical, emergent outcome of the selection rules implemented.
+
+### 1. Zero Entropy is the Fidelity King
+
+* **The Problem:** The fitness function is defined solely by **replicative fidelity**, which is the inverse of the mutation rate $\mu_{eff}$.
+    $$\mu_{eff} = \mu_{base} + k \cdot H_{source}$$
+* **The Result:** The pattern with the absolute lowest Shannon Entropy ($H=0$) has the lowest possible mutation rate, $\mu_{base}$. This makes $H=0$ the global **"replicator optimum."**
+    * **Uniform Patterns:** The patterns '0000000000000000' and '1111111111111111' have $p_0=1$ or $p_1=1$, resulting in $H=0$.
+    * **The "Selfish" Victory:** Since the rules favor the most stable, easiest-to-copy patterns, the selection pressure relentlessly drives all other memes toward these two uniform states.
+
+### 2. The Dominance of Internal Selection
+
+There is a second factor: the **Internal Selection (Pool Replacement)** rule.
+
+* **Rule:** When a new meme is added, the meme with the **Highest Entropy ($H_{max}$)** is removed.
+* **Effect:** This rule acts as a powerful, non-random internal filter that *accelerates* the decline in entropy. It ensures that any mutation that results in a lower-entropy pattern (even slightly) is retained, while any higher-entropy pattern (the more informational ones) are purged from the agent's mind first.
+* **The Feedback Loop:** Low-entropy memes are prioritized for transmission, and new high-entropy mutations are quickly forgotten. This creates a relentless, one-way entropy drain.
+
+***
+
+## Introducing Complexity and Stable Diversity
+
+To prevent total convergence and achieve a stable, diverse configuration, we need to introduce a **second dimension of fitness** that counteracts the purity of replicative fidelity. The memes must acquire some **"functional" value** that favors complexity.
+
+### 1. Introduce a "Function" or "Utility" Fitness
+
+Memes should compete not just on how well they are copied, but on what they **do** for the agent.
+
+* **Definition:** Define a **Target Pattern ($M_{target}$)** that is *complex*
+  => see @config.py the predefined UTILITY_PATTERNS.
+* **Utility Score:** Assign a high **Utility Score ($U$)** to a meme $M$ if it is close to $M_{target}$ (e.g., using **inverse Hamming Distance** to $M_{target}$).
+* **The Trade-Off:** Now, the overall success of a meme must balance its $U$ (utility/complexity) and its $\mu_{eff}$ (fidelity/simplicity).
+
+### 2. Implement Utility-Based Selection
+
+The new selection rules cause that agents to sometimes prioritize utility over fidelity.
+
+#### A. Modify Dominance Election (Internal)
+
+Change how the agent chooses its $M_{dominant}$ for transmission:
+
+* **Old Rule (Pure Fidelity):** Choose the meme with the lowest $H$.
+* **New Rule (Utility-Weighted):** Choose the meme that maximizes a combined score, $S$:
+    $$S = (\alpha \cdot \text{Utility Score}) - (\beta \cdot H)$$
+    where $\alpha$ and $\beta$ are weights. By setting $\alpha$ high, agents are now incentivized to transmit patterns close to the complex $M_{target}$, even if they are riskier to copy.
+
+#### B. Modify Pool Replacement (Internal and External)
+
+Change which meme is forgotten (deleted) when the pool is full:
+
+* **Old Rule (Pure Fidelity):** Remove the highest $H$ meme.
+* **New Rule (Utility-Weighted):** Remove the meme with the **lowest combined score ($S$)** or the **lowest Utility Score ($U$)**. This ensures that memes that have utility are retained, regardless of their high entropy.
+
+### 3. Expected Outcome with Utility
+
+By introducing a complex target pattern and utility-weighted selection a dynamic tension is created:
+
+* **Low-H Memes:** Still exist as stable, background patterns.
+* **High-H Memes:** Are favored for their utility, creating **islands of complexity** around the $M_{target}$ pattern.
+* **Stable Equilibrium:** The system will stabilize at a non-zero average entropy, reflecting patterns that are complex enough to be useful (high $U$) but simple enough to resist complete decay (low $H$ relative to their utility competitors). The **entropy will be maximized, subject to the constraint of replicative fidelity**. This creates a much richer evolutionary scenario. 

@@ -31,12 +31,22 @@ class Agent:
     def get_dominant_meme(self) -> Meme:
         """
         Select the dominant meme from the pool.
-        The dominant meme is the one with the LOWEST Shannon entropy.
+        
+        If utility selection is enabled: Select meme with HIGHEST combined score S = (α × U) - (β × C)
+        Otherwise: Select meme with LOWEST complexity (original behavior)
         
         Returns:
-            The meme with lowest entropy in the pool
+            The dominant meme from the pool
         """
-        return min(self.meme_pool, key=lambda m: m.entropy)
+        if config.USE_UTILITY_SELECTION:
+            # Select meme with highest combined score
+            return max(
+                self.meme_pool, 
+                key=lambda m: m.combined_score(config.ALPHA, config.BETA)
+            )
+        else:
+            # Original behavior: lowest complexity
+            return min(self.meme_pool, key=lambda m: m.complexity)
     
     def internal_rehearsal(self, rng: np.random.Generator):
         """
@@ -78,22 +88,32 @@ class Agent:
     
     def _add_to_pool(self, meme: Meme):
         """
-        Add a meme to the pool. If pool is full, remove the meme
-        with the HIGHEST Shannon entropy.
+        Add a meme to the pool. If pool is full, remove the least fit meme.
+        
+        If utility selection is enabled: Remove meme with LOWEST combined score S = (α × U) - (β × C)
+        Otherwise: Remove meme with HIGHEST complexity (original behavior)
         
         Args:
             meme: Meme to add to pool
         """
         self.meme_pool.append(meme)
         
-        # If pool exceeds size limit, remove highest entropy meme
+        # If pool exceeds size limit, remove least fit meme
         if len(self.meme_pool) > config.POOL_SIZE:
-            # Find and remove the meme with highest entropy
-            max_entropy_idx = max(
-                range(len(self.meme_pool)),
-                key=lambda i: self.meme_pool[i].entropy
-            )
-            self.meme_pool.pop(max_entropy_idx)
+            if config.USE_UTILITY_SELECTION:
+                # Remove meme with lowest combined score
+                min_score_idx = min(
+                    range(len(self.meme_pool)),
+                    key=lambda i: self.meme_pool[i].combined_score(config.ALPHA, config.BETA)
+                )
+                self.meme_pool.pop(min_score_idx)
+            else:
+                # Original behavior: remove highest complexity
+                max_complexity_idx = max(
+                    range(len(self.meme_pool)),
+                    key=lambda i: self.meme_pool[i].complexity
+                )
+                self.meme_pool.pop(max_complexity_idx)
     
     def age_memes(self):
         """Increment the age of all memes in the pool."""
@@ -107,16 +127,26 @@ class Agent:
         Returns:
             Dictionary with pool statistics
         """
-        entropies = [m.entropy for m in self.meme_pool]
+        complexities = [m.complexity for m in self.meme_pool]
+        utilities = [m.utility for m in self.meme_pool]
         ages = [m.age for m in self.meme_pool]
+        scores = [m.combined_score(config.ALPHA, config.BETA) for m in self.meme_pool]
+        
+        dominant = self.get_dominant_meme()
         
         return {
             'pool_size': len(self.meme_pool),
-            'avg_entropy': np.mean(entropies),
-            'min_entropy': np.min(entropies),
-            'max_entropy': np.max(entropies),
+            'avg_complexity': np.mean(complexities),
+            'min_complexity': np.min(complexities),
+            'max_complexity': np.max(complexities),
+            'avg_utility': np.mean(utilities),
+            'min_utility': np.min(utilities),
+            'max_utility': np.max(utilities),
+            'avg_score': np.mean(scores),
             'avg_age': np.mean(ages),
-            'dominant_entropy': self.get_dominant_meme().entropy,
+            'dominant_complexity': dominant.complexity,
+            'dominant_utility': dominant.utility,
+            'dominant_score': dominant.combined_score(config.ALPHA, config.BETA),
         }
     
     def copy(self) -> 'Agent':

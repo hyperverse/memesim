@@ -48,14 +48,25 @@ class SimulationEngine:
         
         # Log generation statistics
         stats = self.grid.get_grid_stats()
-        logger.info(
-            f"Gen {self.generation}: "
-            f"avg_H={stats['avg_dominant_entropy']:.4f}, "
-            f"min_H={stats['min_dominant_entropy']:.4f}, "
-            f"max_H={stats['max_dominant_entropy']:.4f}, "
-            f"unique_patterns={stats['unique_patterns']}, "
-            f"total_patterns={stats['total_patterns']}"
-        )
+        
+        if config.USE_UTILITY_SELECTION:
+            logger.info(
+                f"Gen {self.generation}: "
+                f"avg_C={stats['avg_dominant_complexity']:.4f}, "
+                f"avg_U={stats['avg_dominant_utility']:.4f}, "
+                f"avg_S={stats['avg_dominant_score']:.4f}, "
+                f"diversity={stats['pattern_diversity']:.3f}, "
+                f"unique={stats['unique_patterns']}"
+            )
+        else:
+            logger.info(
+                f"Gen {self.generation}: "
+                f"avg_C={stats['avg_dominant_complexity']:.4f}, "
+                f"min_C={stats['min_dominant_complexity']:.4f}, "
+                f"max_C={stats['max_dominant_complexity']:.4f}, "
+                f"unique_patterns={stats['unique_patterns']}, "
+                f"total_patterns={stats['total_patterns']}"
+            )
     
     def _internal_dynamics_phase(self):
         """
@@ -63,8 +74,8 @@ class SimulationEngine:
         
         Each agent:
         1.1 Self-Rehearsal: Copy a random meme with internal mutation
-        1.2 Pool Update: Remove highest entropy if pool exceeds size
-        1.3 Dominance Election: Select lowest entropy meme as dominant
+        1.2 Pool Update: Remove highest complexity if pool exceeds size
+        1.3 Dominance Election: Select lowest complexity meme as dominant
         """
         logger.debug("Phase 1: Internal Dynamics")
         
@@ -82,12 +93,21 @@ class SimulationEngine:
             
             if logger.isEnabledFor(logging.DEBUG):
                 pool_stats = agent.get_pool_stats()
-                logger.debug(
-                    f"Agent({agent.x},{agent.y}): "
-                    f"dominant_H={pool_stats['dominant_entropy']:.4f}, "
-                    f"pool_avg_H={pool_stats['avg_entropy']:.4f}, "
-                    f"pool_size={pool_stats['pool_size']}"
-                )
+                if config.USE_UTILITY_SELECTION:
+                    logger.debug(
+                        f"Agent({agent.x},{agent.y}): "
+                        f"dom_C={pool_stats['dominant_complexity']:.4f}, "
+                        f"dom_U={pool_stats['dominant_utility']:.4f}, "
+                        f"dom_S={pool_stats['dominant_score']:.4f}, "
+                        f"pool_avg_U={pool_stats['avg_utility']:.4f}"
+                    )
+                else:
+                    logger.debug(
+                        f"Agent({agent.x},{agent.y}): "
+                        f"dominant_C={pool_stats['dominant_complexity']:.4f}, "
+                        f"pool_avg_C={pool_stats['avg_complexity']:.4f}, "
+                        f"pool_size={pool_stats['pool_size']}"
+                    )
     
     def _external_dynamics_phase(self):
         """
@@ -124,11 +144,19 @@ class SimulationEngine:
             new_agent.receive_meme(neighbor_dominant, self.rng)
             
             if logger.isEnabledFor(logging.DEBUG):
-                logger.debug(
-                    f"Agent({new_agent.x},{new_agent.y}) <- "
-                    f"Agent({selected_neighbor.x},{selected_neighbor.y}): "
-                    f"copied meme with H={neighbor_dominant.entropy:.4f}"
-                )
+                if config.USE_UTILITY_SELECTION:
+                    logger.debug(
+                        f"Agent({new_agent.x},{new_agent.y}) <- "
+                        f"Agent({selected_neighbor.x},{selected_neighbor.y}): "
+                        f"copied meme C={neighbor_dominant.complexity:.4f}, "
+                        f"U={neighbor_dominant.utility:.4f}"
+                    )
+                else:
+                    logger.debug(
+                        f"Agent({new_agent.x},{new_agent.y}) <- "
+                        f"Agent({selected_neighbor.x},{selected_neighbor.y}): "
+                        f"copied meme with C={neighbor_dominant.complexity:.4f}"
+                    )
         
         # State Update: Replace all agents in grid simultaneously
         self.grid.set_all_agents(new_agents)

@@ -34,14 +34,14 @@ class Grid:
                 ]
                 self.agents[x, y] = Agent(x, y, initial_memes)
     
-    def inject_seed_patterns(self, seed_patterns: List[List[int]]):
+    def inject_patterns(self, patterns: List[List[int]]):
         """
         Inject specific seed patterns into random locations on the grid.
         
         Args:
-            seed_patterns: List of binary patterns to inject
+            patterns: List of binary patterns to inject
         """
-        for pattern in seed_patterns:
+        for pattern in patterns:
             # Choose random location
             x = self.rng.integers(0, self.size)
             y = self.rng.integers(0, self.size)
@@ -127,15 +127,28 @@ class Grid:
         """
         all_agents = self.get_all_agents()
         
-        # Collect dominant meme entropies
-        dominant_entropies = [
-            agent.get_dominant_meme().entropy for agent in all_agents
-        ]
+        # Collect dominant meme metrics
+        dominant_complexities = []
+        dominant_utilities = []
+        dominant_scores = []
         
-        # Collect all pool entropies
-        all_entropies = []
         for agent in all_agents:
-            all_entropies.extend([m.entropy for m in agent.meme_pool])
+            dominant = agent.get_dominant_meme()
+            dominant_complexities.append(dominant.complexity)
+            dominant_utilities.append(dominant.utility)
+            dominant_scores.append(dominant.combined_score(
+                config.ALPHA if hasattr(config, 'ALPHA') else 1.0,
+                config.BETA if hasattr(config, 'BETA') else 0.5
+            ))
+        
+        # Collect all pool metrics
+        all_complexities = []
+        all_utilities = []
+        
+        for agent in all_agents:
+            for meme in agent.meme_pool:
+                all_complexities.append(meme.complexity)
+                all_utilities.append(meme.utility)
         
         # Collect unique patterns (as tuples for hashing)
         unique_patterns = set()
@@ -144,12 +157,24 @@ class Grid:
                 unique_patterns.add(tuple(meme.pattern))
         
         return {
-            'avg_dominant_entropy': np.mean(dominant_entropies),
-            'std_dominant_entropy': np.std(dominant_entropies),
-            'min_dominant_entropy': np.min(dominant_entropies),
-            'max_dominant_entropy': np.max(dominant_entropies),
-            'avg_pool_entropy': np.mean(all_entropies),
+            # Dominant meme statistics
+            'avg_dominant_complexity': np.mean(dominant_complexities),
+            'std_dominant_complexity': np.std(dominant_complexities),
+            'min_dominant_complexity': np.min(dominant_complexities),
+            'max_dominant_complexity': np.max(dominant_complexities),
+            'avg_dominant_utility': np.mean(dominant_utilities),
+            'std_dominant_utility': np.std(dominant_utilities),
+            'min_dominant_utility': np.min(dominant_utilities),
+            'max_dominant_utility': np.max(dominant_utilities),
+            'avg_dominant_score': np.mean(dominant_scores),
+            
+            # Pool-wide statistics
+            'avg_pool_complexity': np.mean(all_complexities),
+            'avg_pool_utility': np.mean(all_utilities),
+            
+            # Diversity metrics
             'unique_patterns': len(unique_patterns),
-            'total_patterns': len(all_entropies),
+            'total_patterns': len(all_complexities),
+            'pattern_diversity': len(unique_patterns) / len(all_complexities) if all_complexities else 0,
         }
 
