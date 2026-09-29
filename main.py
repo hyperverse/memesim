@@ -25,13 +25,9 @@ def main():
     logger.info(f"Grid Size: {config.GRID_SIZE}x{config.GRID_SIZE}")
     logger.info(f"Meme Length: {config.MEME_LENGTH}")
     logger.info(f"Pool Size: {config.POOL_SIZE}")
-    logger.info(f"Internal Mutation Rate: {config.MU_BASE_INTERNAL}")
-    logger.info(f"External Mutation Rate: {config.MU_BASE_EXTERNAL}")
-    logger.info(f"Complexity Scale Factor: {config.COMPLEXITY_SCALE_FACTOR}")
-    if config.USE_UTILITY_SELECTION:
-        logger.info(f"Utility Selection: ENABLED (α={config.ALPHA}, β={config.BETA})")
-    else:
-        logger.info(f"Utility Selection: DISABLED (pure fidelity mode)")
+    logger.info(f"Hearing flip rate: {config.HEARING_FLIP_RATE}")
+    logger.info(f"Mismatch threshold: {config.MISMATCH_THRESHOLD}")
+    logger.info("Exchange: recall what was heard (see doc/NOTES.md)")
     
     # Initialize random number generator with fixed seed for reproducibility
     # Remove seed parameter for random behavior each run

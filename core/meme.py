@@ -12,19 +12,21 @@ class Meme:
     Its Shannon entropy / complexity determines its copying fidelity.
     """
     
-    def __init__(self, pattern: List[int], age: int = 0):
+    def __init__(self, pattern: List[int], age: int = 0, strength: int = 1):
         """
         Initialize a meme with a binary pattern.
         
         Args:
             pattern: List of 0s and 1s of length config.MEME_LENGTH
             age: The age of this meme (generations since creation)
+            strength: How many close hearings have confirmed this pattern
         """
         assert len(pattern) == config.MEME_LENGTH, f"Pattern must be length {config.MEME_LENGTH}"
         assert all(bit in [0, 1] for bit in pattern), "Pattern must contain only 0s and 1s"
         
         self.pattern = np.array(pattern, dtype=np.int8)
         self.age = age
+        self.strength = strength
         self._entropy = None  # Cached entropy value
         self._complexity = None  # Cached complexity value
         self._utility = None  # Cached utility value
@@ -163,7 +165,10 @@ class Meme:
     
     def __repr__(self) -> str:
         pattern_str = ''.join(str(bit) for bit in self.pattern)
-        return f"Meme(pattern={pattern_str}, C={self.complexity:.3f}, U={self.utility:.3f}, age={self.age})"
+        return (
+            f"Meme(pattern={pattern_str}, C={self.complexity:.3f}, "
+            f"U={self.utility:.3f}, strength={self.strength}, age={self.age})"
+        )
     
     @staticmethod
     def random(rng: np.random.Generator) -> 'Meme':

@@ -1,5 +1,5 @@
 """
-Simulation engine coordinating the two-tiered evolution process.
+Simulation engine for the recall exchange between neighboring agents.
 """
 import numpy as np
 import logging
@@ -12,10 +12,11 @@ logger = logging.getLogger(__name__)
 
 class SimulationEngine:
     """
-    Coordinates the simulation cycle:
-    1. Internal dynamics (rehearsal, pool update, dominance election)
-    2. External dynamics (neighbor selection, mirroring, invasion)
-    3. State update
+    Coordinates one exchange per generation.
+
+    Every agent hears one neighbor's broadcast, strengthens a close slot or
+    writes the heard string onto the weakest slot, and broadcasts that slot.
+    Reads come from the previous generation and writes land together.
     """
     
     def __init__(self, grid: Grid, rng: np.random.Generator):
@@ -32,134 +33,57 @@ class SimulationEngine:
     
     def step(self):
         """
-        Execute one generation of the simulation.
-        Implements the complete cycle from the specification.
+        Execute one generation: each agent hears one neighbor and updates its pool.
         """
         logger.debug(f"=== Generation {self.generation} ===")
         
-        # Phase 1: Internal Dynamics
-        self._internal_dynamics_phase()
-        
-        # Phase 2: External Dynamics
-        self._external_dynamics_phase()
-        
-        # Increment generation counter
+        n_strengthen, n_write = self._recall_exchange()
         self.generation += 1
         
-        # Log generation statistics
         stats = self.grid.get_grid_stats()
-        
-        if config.USE_UTILITY_SELECTION:
-            logger.info(
-                f"Gen {self.generation}: "
-                f"avg_C={stats['avg_dominant_complexity']:.4f}, "
-                f"avg_U={stats['avg_dominant_utility']:.4f}, "
-                f"avg_S={stats['avg_dominant_score']:.4f}, "
-                f"diversity={stats['pattern_diversity']:.3f}, "
-                f"unique={stats['unique_patterns']}"
-            )
-        else:
-            logger.info(
-                f"Gen {self.generation}: "
-                f"avg_C={stats['avg_dominant_complexity']:.4f}, "
-                f"min_C={stats['min_dominant_complexity']:.4f}, "
-                f"max_C={stats['max_dominant_complexity']:.4f}, "
-                f"unique_patterns={stats['unique_patterns']}, "
-                f"total_patterns={stats['total_patterns']}"
-            )
+        strengths = [
+            agent.get_dominant_meme().strength
+            for agent in self.grid.get_all_agents()
+        ]
+        logger.info(
+            f"Gen {self.generation}: "
+            f"strengthen={n_strengthen}, write={n_write}, "
+            f"unique={stats['unique_patterns']}, "
+            f"mean_broadcast_strength={float(np.mean(strengths)):.2f}"
+        )
     
-    def _internal_dynamics_phase(self):
+    def _recall_exchange(self) -> tuple[int, int]:
         """
-        Phase 1: Internal Dynamics
+        Hear one neighbor's previous broadcast and answer from the pool.
         
-        Each agent:
-        1.1 Self-Rehearsal: Copy a random meme with internal mutation
-        1.2 Pool Update: Remove highest complexity if pool exceeds size
-        1.3 Dominance Election: Select lowest complexity meme as dominant
+        All agents read the previous generation and write their new pools
+        together.
         """
-        logger.debug("Phase 1: Internal Dynamics")
+        new_agents = [agent.copy() for agent in self.grid.get_all_agents()]
+        n_strengthen = 0
+        n_write = 0
         
-        all_agents = self.grid.get_all_agents()
-        
-        for agent in all_agents:
-            # 1.1 & 1.2: Internal rehearsal (includes pool management)
-            agent.internal_rehearsal(self.rng)
-            
-            # Age all memes
-            agent.age_memes()
-            
-            # 1.3: Dominance election (happens automatically when needed)
-            dominant = agent.get_dominant_meme()
-            
-            if logger.isEnabledFor(logging.DEBUG):
-                pool_stats = agent.get_pool_stats()
-                if config.USE_UTILITY_SELECTION:
-                    logger.debug(
-                        f"Agent({agent.x},{agent.y}): "
-                        f"dom_C={pool_stats['dominant_complexity']:.4f}, "
-                        f"dom_U={pool_stats['dominant_utility']:.4f}, "
-                        f"dom_S={pool_stats['dominant_score']:.4f}, "
-                        f"pool_avg_U={pool_stats['avg_utility']:.4f}"
-                    )
-                else:
-                    logger.debug(
-                        f"Agent({agent.x},{agent.y}): "
-                        f"dominant_C={pool_stats['dominant_complexity']:.4f}, "
-                        f"pool_avg_C={pool_stats['avg_complexity']:.4f}, "
-                        f"pool_size={pool_stats['pool_size']}"
-                    )
-    
-    def _external_dynamics_phase(self):
-        """
-        Phase 2: External Dynamics
-        
-        Each agent:
-        2.1 Target Selection: Select a random neighbor
-        2.2 Mirroring & Error: Copy neighbor's dominant with external mutation
-        2.3 External Invasion: Add to pool (remove highest H if full)
-        
-        IMPORTANT: This implements proper CA-style simultaneous update using
-        double buffering. All agents read from the OLD grid state and write
-        to NEW agent copies, then the grid is updated all at once.
-        """
-        logger.debug("Phase 2: External Dynamics")
-        
-        # Get current grid state (these are the agents we READ from)
-        old_agents = self.grid.get_all_agents()
-        
-        # Create copies of all agents (these are the agents we WRITE to)
-        new_agents = [agent.copy() for agent in old_agents]
-        
-        # Build a mapping from (x, y) to new agent for easy lookup
-        new_agent_map = {(agent.x, agent.y): agent for agent in new_agents}
-        
-        # Process each agent using OLD grid for reading neighbors
         for new_agent in new_agents:
-            # 2.1: Select random neighbor from OLD grid state
-            old_neighbors = self.grid.get_moore_neighbors(new_agent.x, new_agent.y)
-            selected_neighbor = self.rng.choice(old_neighbors)
+            neighbors = self.grid.get_moore_neighbors(new_agent.x, new_agent.y)
+            neighbor = self.rng.choice(neighbors)
+            heard = neighbor.get_dominant_meme().pattern.copy()
+            flips = self.rng.random(len(heard)) < config.HEARING_FLIP_RATE
+            heard[flips] = 1 - heard[flips]
             
-            # 2.2 & 2.3: Copy dominant meme from OLD neighbor to NEW agent
-            neighbor_dominant = selected_neighbor.get_dominant_meme()
-            new_agent.receive_meme(neighbor_dominant, self.rng)
+            outcome = new_agent.hear(heard)
+            if outcome == "strengthen":
+                n_strengthen += 1
+            else:
+                n_write += 1
             
             if logger.isEnabledFor(logging.DEBUG):
-                if config.USE_UTILITY_SELECTION:
-                    logger.debug(
-                        f"Agent({new_agent.x},{new_agent.y}) <- "
-                        f"Agent({selected_neighbor.x},{selected_neighbor.y}): "
-                        f"copied meme C={neighbor_dominant.complexity:.4f}, "
-                        f"U={neighbor_dominant.utility:.4f}"
-                    )
-                else:
-                    logger.debug(
-                        f"Agent({new_agent.x},{new_agent.y}) <- "
-                        f"Agent({selected_neighbor.x},{selected_neighbor.y}): "
-                        f"copied meme with C={neighbor_dominant.complexity:.4f}"
-                    )
+                logger.debug(
+                    f"Agent({new_agent.x},{new_agent.y}) <- "
+                    f"Agent({neighbor.x},{neighbor.y}): {outcome}"
+                )
         
-        # State Update: Replace all agents in grid simultaneously
         self.grid.set_all_agents(new_agents)
+        return n_strengthen, n_write
     
     def get_generation(self) -> int:
         """Get the current generation number."""

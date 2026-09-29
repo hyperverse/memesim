@@ -11,7 +11,12 @@ Implemented with Cursor / Claude 4.5 Sonnet.
   * Adding packages: `uv add <package>`
   * Update .venv: `uv sync`
 
-See @MemeSimulation.md for a description of the project.
+Design notes and run write-ups are in [doc/](doc/):
+
+- [doc/MemeSimulation.md](doc/MemeSimulation.md) — original specification
+- [doc/pattern-persistence.md](doc/pattern-persistence.md) — fidelity collapse, and the counterflow reading
+- [doc/NOTES.md](doc/NOTES.md) — the two agent-to-agent exchanges
+- [doc/recall-exchange-run.md](doc/recall-exchange-run.md) — 1000-generation recall run
 
 ## Running the Simulation
 
@@ -52,7 +57,8 @@ memesim/
 │   ├── agent.py      # Agent class with meme pool
 │   └── grid.py       # Spatial grid with Moore neighborhood
 ├── simulation/
-│   └── engine.py     # Two-tiered evolution cycle
+│   └── engine.py     # Recall exchange between neighbors
+├── doc/              # Specification, notes, and run write-ups
 ├── visualization/
 │   └── renderer.py   # Pygame-based visualization
 ├── utils/

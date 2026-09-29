@@ -10,8 +10,8 @@ import config
 
 class Agent:
     """
-    An agent is a host located at (x, y) that maintains a pool of memes
-    and performs internal and external replication.
+    An agent is a host located at (x, y) that keeps a pool of memes
+    and answers a neighbor's broadcast from that pool.
     """
     
     def __init__(self, x: int, y: int, initial_memes: List[Meme]):
@@ -27,26 +27,50 @@ class Agent:
         self.y = y
         self.meme_pool: List[Meme] = initial_memes[:config.POOL_SIZE]
         assert len(self.meme_pool) > 0, "Agent must have at least one meme"
+        # Slot broadcast on the next exchange. Updated by hear().
+        self.broadcast_index = 0
     
     def get_dominant_meme(self) -> Meme:
         """
-        Select the dominant meme from the pool.
+        Return the pattern this agent is broadcasting.
         
-        If utility selection is enabled: Select meme with HIGHEST combined score S = (α × U) - (β × C)
-        Otherwise: Select meme with LOWEST complexity (original behavior)
+        That is the slot selected by the last hearing: the closest slot when
+        the hearing was close, or the slot just written when it was far.
+        """
+        return self.meme_pool[self.broadcast_index]
+    
+    def hear(self, heard_pattern: np.ndarray) -> str:
+        """
+        Match a heard string against the pool.
+        
+        A close hearing strengthens the closest slot and leaves its bits
+        unchanged. A far hearing copies the heard string onto the weakest slot.
         
         Returns:
-            The dominant meme from the pool
+            "strengthen" or "write"
         """
-        if config.USE_UTILITY_SELECTION:
-            # Select meme with highest combined score
-            return max(
-                self.meme_pool, 
-                key=lambda m: m.combined_score(config.ALPHA, config.BETA)
-            )
-        else:
-            # Original behavior: lowest complexity
-            return min(self.meme_pool, key=lambda m: m.complexity)
+        heard = np.asarray(heard_pattern, dtype=np.int8)
+        distances = [
+            int(np.sum(meme.pattern != heard)) for meme in self.meme_pool
+        ]
+        min_bits = min(distances)
+        candidates = [i for i, bits in enumerate(distances) if bits == min_bits]
+        best = max(candidates, key=lambda i: self.meme_pool[i].strength)
+        
+        if (min_bits / len(heard)) <= config.MISMATCH_THRESHOLD:
+            self.meme_pool[best].strength += 1
+            self.broadcast_index = best
+            return "strengthen"
+        
+        weakest = min(
+            range(len(self.meme_pool)),
+            key=lambda i: (self.meme_pool[i].strength, i),
+        )
+        self.meme_pool[weakest] = Meme(
+            heard.tolist(), strength=config.INITIAL_STRENGTH
+        )
+        self.broadcast_index = weakest
+        return "write"
     
     def internal_rehearsal(self, rng: np.random.Generator):
         """
@@ -162,11 +186,14 @@ class Agent:
         for meme in self.meme_pool:
             # Create new meme with copied pattern and same age
             copied_pattern = meme.pattern.copy()
-            copied_meme = Meme(copied_pattern.tolist(), age=meme.age)
+            copied_meme = Meme(
+                copied_pattern.tolist(), age=meme.age, strength=meme.strength
+            )
             copied_memes.append(copied_meme)
         
         # Create new agent with copied memes
         new_agent = Agent(self.x, self.y, copied_memes)
+        new_agent.broadcast_index = self.broadcast_index
         return new_agent
     
     def __repr__(self) -> str:
